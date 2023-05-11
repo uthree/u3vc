@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.nn.utils.spectral_norm as norm
 import torchaudio
 
@@ -39,9 +40,9 @@ class SpeakerEncoder(nn.Module):
 class ContentEncoderResBlock(nn.Module):
     def __init__(self, channels):
         super().__init__()
-        self.conv1 = norm(nn.Conv1d(channels, channesl, 5, 1, 2))
+        self.conv1 = norm(nn.Conv1d(channels, channels, 5, 1, 2))
         self.relu = nn.LeakyReLU(0.1)
-        self.conv2 = norm(nn.Conv1d(channels, channesl, 5, 1, 2))
+        self.conv2 = norm(nn.Conv1d(channels, channels, 5, 1, 2))
 
     def forward(self, x):
         return self.conv2(self.relu(self.conv1(x))) + x
@@ -50,10 +51,10 @@ class ContentEncoderResBlock(nn.Module):
 class GeneratorResBlock(nn.Module):
     def __init__(self, channels, condition_channels=256):
         super().__init__()
-        self.conv1 = norm(nn.Conv1d(channels, channesl, 5, 1, 2))
+        self.conv1 = norm(nn.Conv1d(channels, channels, 5, 1, 2))
         self.relu = nn.LeakyReLU(0.1)
-        self.conv2 = norm(nn.Conv1d(channels, channesl, 5, 1, 2))
-        self.condition_conv = norm(nn.Conv1d(condition_channels, channels))
+        self.conv2 = norm(nn.Conv1d(channels, channels, 5, 1, 2))
+        self.condition_conv = norm(nn.Conv1d(condition_channels, channels, 1, 1, 0))
 
     def forward(self, x, c):
         res = x
@@ -125,13 +126,13 @@ class Generator(nn.Module):
     def __init__(self):
         super().__init__()
         self.initial_conv = norm(nn.Conv1d(256, 256, 7, 1, 3))
-        self.u1 = norm(nn.Conv1d(256, 256, 16, 8, 4))
+        self.u1 = norm(nn.ConvTranspose1d(256, 256, 16, 8, 4))
         self.c1 = GeneratorResStack(256)
-        self.u2 = norm(nn.Conv1d(256, 128, 16, 8, 4))
+        self.u2 = norm(nn.ConvTranspose1d(256, 128, 16, 8, 4))
         self.c2 = GeneratorResStack(128)
-        self.u3 = norm(nn.Conv1d(128, 64, 4, 2, 1))
+        self.u3 = norm(nn.ConvTranspose1d(128, 64, 4, 2, 1))
         self.c3 = GeneratorResStack(64)
-        self.u4 = norm(nn.Conv1d(64, 32, 4, 2, 1))
+        self.u4 = norm(nn.ConvTranspose1d(64, 32, 4, 2, 1))
         self.c4 = GeneratorResStack(32)
         self.last_conv = norm(nn.Conv1d(32, 1, 7, 1, 3))
 
@@ -146,4 +147,84 @@ class Generator(nn.Module):
         x = self.u4(x)
         x = self.c4(x, c)
         x = self.last_conv(x)
+        x = x.squeeze(1)
+        # [batch, 1, len] -> [batch, len]
         return x
+
+
+class SubDiscriminator(nn.Module):
+    def __init__(self, pool=1):
+        super.__init__()
+        self.pool = nn.AvgPool1d(pool)
+        self.initial_conv = norm(nn.Conv1d(1, 32, 7, 1, 3))
+        self.layers = nn.ModuleList([
+            norm(nn.Conv1d(32, 64, 4, 2, 1)),
+            norm(nn.Conv1d(64, 96, 4, 2, 1)),
+            norm(nn.Conv1d(96, 128, 16, 8, 4)),
+            norm(nn.Conv1d(128, 128, 16, 8, 4)),
+            ])
+        self.output_layer = norm(nn.Conv1d(128, 1, 7, 1, 3))
+
+    def forward(self, x):
+        # [batch, len] -> [batch, 1, len]
+        x = x.unsqueeze(1)
+        x = self.initial_conv(x)
+        for layer in self.layers:
+            x = layer(x)
+            x = F.leaky_relu(x, 0.1)
+        x = output_layer(x)
+        return x
+
+    def feature_matching_loss(self, x, y):
+        x = x.unsqueeze(1)
+        x = self.initial_conv(x)
+        y = y.unsqueeze(1)
+        with torch.no_grad():
+            y = self.initial_conv(x)
+        loss = 0
+        for layer in self.layers:
+            x = layer(x)
+            x = F.leaky_relu(x, 0.1)
+            with torch.no_grad():
+                y = layer(x)
+                y = F.leaky_relu(y, 0.1)
+            loss += (x - y).abs().mean()
+        return loss
+
+
+class Discriminator(nn.Module):
+    def __init__(self, pools=[1, 2, 4]):
+        super().__init__()
+        self.sub_discriminators = nn.ModuleList([])
+        for p in pools:
+            self.sub_discriminators.append(SubDiscriminator(p))
+
+    def logits(self, x):
+        out = []
+        for d in self.sub_discriminators:
+            out.append(d(x))
+        return out
+
+    def feature_matching_loss(self, x, y):
+        loss = 0
+        for d in self.sub_discriminators:
+            loss += d.feature_matching_loss(x, y)
+        return loss
+
+
+class Convertor(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.speaker_encoder = SpeakerEncoder()
+        self.content_encoder = ContentEncoder()
+        self.generator = Generator()
+
+    def encode_speaker(self, wave):
+        mean, _ = self.speaker_encoder(wave)
+        return mean
+
+    def convert(self, wave, target_speaker):
+        z = self.content_encoder(wave)
+        y = self.generator(z, target_speaker)
+        return y
+
