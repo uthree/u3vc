@@ -104,11 +104,7 @@ for epoch in range(args.epoch):
                 loss_adv += (logit ** 2).mean()
 
             # Content Preservation Loss
-            for param in Ec.parameters():
-                param.requires_grad = False
             loss_con = ((Ec(wave_src) - Ec(convert_out)) ** 2).mean()
-            for param in Ec.parameters():
-                param.requires_grad = True
 
             # KL Loss
             loss_kl = (-1 - logvar_src + torch.exp(logvar_src) + mean_src ** 2).mean()

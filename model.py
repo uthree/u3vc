@@ -80,7 +80,7 @@ class MRF(nn.Module):
 
 
 class GeneratorResBlock(nn.Module):
-    def __init__(self, channels, condition_channels=256, kernel_sizes=[3, 5, 7], dilations=[1, 2, 3]):
+    def __init__(self, channels, condition_channels=256, kernel_sizes=[7, 7, 7], dilations=[1, 2, 3]):
         super().__init__()
         self.condition_conv = norm(nn.Conv1d(condition_channels, channels, 1, 1, 0))
         self.mrf = MRF(channels, kernel_sizes, dilations)
