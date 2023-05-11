@@ -368,7 +368,7 @@ class Convertor(nn.Module):
 
 
 class MelLoss(nn.Module):
-    def __init__(self, sample_rate=22050, n_fft=1024, n_mels=80, normalized=False):
+    def __init__(self, sample_rate=22050, n_fft=1024, n_mels=80, normalized=True):
         super().__init__()
         self.to_mel = torchaudio.transforms.MelSpectrogram(sample_rate,
                                                            n_mels=n_mels,
@@ -380,7 +380,7 @@ class MelLoss(nn.Module):
         self.to_mel = self.to_mel.to(real.device)
         with torch.no_grad():
             real_mel = self.to_mel(real)
-        return F.l1_loss(self.to_mel(fake), real_mel)
+        return ((self.to_mel(fake) - real_mel) ** 2).mean()
 
 
 class SpectralLoss(nn.Module):
@@ -393,5 +393,5 @@ class SpectralLoss(nn.Module):
     def forward(self, fake, real):
         loss = 0
         for mel_loss in self.mel_losses:
-            loss += mel_loss(fake, real) / len(self.mel_losses)
+            loss += mel_loss(fake, real)
         return loss
