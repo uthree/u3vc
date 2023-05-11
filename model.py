@@ -49,23 +49,6 @@ class ContentEncoderResBlock(nn.Module):
         return self.relu2(self.conv2(self.relu1(self.conv1(x)))) + x
 
 
-class MRFResBlock(nn.Module):
-    def __init__(self, channels, kernel_size=3, dilation=1):
-        super().__init__()
-        self.c1 = nn.Conv1d(channels, channels, kernel_size, 1, 
-                            padding='same', dilation=dilation)
-        self.c2 = nn.Conv1d(channels, channels, kernel_size, 1,
-                            padding='same', dilation=dilation)
-        self.act1 = nn.LeakyReLU(0.1)
-        self.act2 = nn.LeakyReLU(0.1)
-
-    def forward(self, x):
-        x = self.c1(self.act1(x)) + x
-        x = self.c2(self.act2(x)) + x
-        return x
-
-
-
 class GeneratorResBlock(nn.Module):
     def __init__(self, channels, condition_channels=128):
         super().__init__()
