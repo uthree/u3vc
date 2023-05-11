@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(description="run training")
 parser.add_argument('dataset')
 parser.add_argument('-d', '--device', default='cpu')
 parser.add_argument('-e', '--epoch', default=1000, type=int)
-parser.add_argument('-b', '--batch-size', default=4, type=int)
+parser.add_argument('-b', '--batch-size', default=1, type=int)
 parser.add_argument('-lr', '--learning-rate', default=1e-4, type=float)
 parser.add_argument('-len', '--length', default=65536, type=int)
 parser.add_argument('-m', '--max-data', default=-1, type=int)
@@ -64,8 +64,8 @@ weight_con = 10.0
 weight_kl = 0.02
 weight_spe = 1.0
 
-OptC = optim.Adam(C.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
-OptD = optim.Adam(D.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
+OptC = optim.AdamW(C.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
+OptD = optim.AdamW(D.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
 
 Es = C.speaker_encoder
 Ec = C.content_encoder
@@ -104,7 +104,11 @@ for epoch in range(args.epoch):
                 loss_adv += (logit ** 2).mean()
 
             # Content Preservation Loss
+            for param in Ec.parameters():
+                param.requires_grad = False
             loss_con = ((Ec(wave_src) - Ec(convert_out)) ** 2).mean()
+            for param in Ec.parameters():
+                param.requires_grad = True
 
             # KL Loss
             loss_kl = (-1 - logvar_src + torch.exp(logvar_src) + mean_src ** 2).mean()

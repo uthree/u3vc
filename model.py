@@ -66,7 +66,7 @@ class MRFResBlock(nn.Module):
 
 
 class MRF(nn.Module):
-    def __init__(self, channels, kernel_sizes=[3, 5, 7], dilations=[1, 2, 3]):
+    def __init__(self, channels, kernel_sizes=[7, 7, 7], dilations=[1, 2, 3]):
         super().__init__()
         self.blocks = nn.ModuleList([])
         for d, k in zip(dilations, kernel_sizes):
@@ -86,14 +86,13 @@ class GeneratorResBlock(nn.Module):
         self.mrf = MRF(channels, kernel_sizes, dilations)
 
     def forward(self, x, c):
-        res = x
         x = x * torch.sigmoid(self.condition_conv(c))
         x = self.mrf(x)
-        return x + res
+        return x
 
 
 class ContentEncoderResStack(nn.Module):
-    def __init__(self, channels, num_layers=2):
+    def __init__(self, channels, num_layers=3):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
@@ -109,13 +108,14 @@ class GeneratorResStack(nn.Module):
     def __init__(self,
             channels,
             condition_channels=256,
-            num_layers=2,
-            kernel_sizes = [3, 5, 7],
+            num_layers=3,
+            kernel_sizes = [7, 7, 7],
             dilations = [1, 2, 3]):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
-            self.layers.append(GeneratorResBlock(channels, condition_channels))
+            self.layers.append(GeneratorResBlock(channels, condition_channels,
+                kernel_sizes=kernel_sizes, dilations=dilations))
 
     def forward(self, x, c):
         for layer in self.layers:
@@ -158,13 +158,13 @@ class Generator(nn.Module):
     def __init__(self, dim_content=4):
         super().__init__()
         self.initial_conv = norm(nn.Conv1d(dim_content, 256, 7, 1, 3))
-        self.u1 = norm(nn.ConvTranspose1d(256, 256, 16, 8, 4))
+        self.u1 = norm(nn.ConvTranspose1d(256, 256, 4, 2, 1))
         self.c1 = GeneratorResStack(256)
-        self.u2 = norm(nn.ConvTranspose1d(256, 128, 16, 8, 4))
+        self.u2 = norm(nn.ConvTranspose1d(256, 128, 4, 2, 1))
         self.c2 = GeneratorResStack(128)
-        self.u3 = norm(nn.ConvTranspose1d(128, 64, 4, 2, 1))
+        self.u3 = norm(nn.ConvTranspose1d(128, 64, 16, 8, 4))
         self.c3 = GeneratorResStack(64)
-        self.u4 = norm(nn.ConvTranspose1d(64, 32, 4, 2, 1))
+        self.u4 = norm(nn.ConvTranspose1d(64, 32, 16, 8, 4))
         self.c4 = GeneratorResStack(32)
         self.last_conv = norm(nn.Conv1d(32, 1, 7, 1, 3))
 
@@ -354,7 +354,7 @@ class DiscriminatorP(nn.Module):
         for sd in self.sub_discriminators:
             feats_y = feats_y + sd.feats(y)
         for x, y in zip(feats_x, feats_y):
-            loss += (x - y).abs().mean()
+            loss += (x - y).abs().mean() / len(self.sub_discriminators)
         return loss
 
 
