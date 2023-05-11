@@ -66,7 +66,7 @@ class GeneratorResBlock(nn.Module):
 
 
 class ContentEncoderResStack(nn.Module):
-    def __init__(self, channels, num_layers=2):
+    def __init__(self, channels, num_layers=4):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
@@ -79,7 +79,7 @@ class ContentEncoderResStack(nn.Module):
 
 
 class GeneratorResStack(nn.Module):
-    def __init__(self, channels, condition_channels=256, num_layers=2):
+    def __init__(self, channels, condition_channels=256, num_layers=4):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
@@ -147,6 +147,7 @@ class Generator(nn.Module):
         x = self.u4(x)
         x = self.c4(x, c)
         x = self.last_conv(x)
+        x = torch.tanh(x)
         x = x.squeeze(1)
         # [batch, 1, len] -> [batch, len]
         return x
@@ -154,7 +155,7 @@ class Generator(nn.Module):
 
 class SubDiscriminator(nn.Module):
     def __init__(self, pool=1):
-        super.__init__()
+        super().__init__()
         self.pool = nn.AvgPool1d(pool)
         self.initial_conv = norm(nn.Conv1d(1, 32, 7, 1, 3))
         self.layers = nn.ModuleList([
@@ -172,21 +173,21 @@ class SubDiscriminator(nn.Module):
         for layer in self.layers:
             x = layer(x)
             x = F.leaky_relu(x, 0.1)
-        x = output_layer(x)
+        x = self.output_layer(x)
         return x
 
     def feature_matching_loss(self, x, y):
         x = x.unsqueeze(1)
         x = self.initial_conv(x)
-        y = y.unsqueeze(1)
         with torch.no_grad():
-            y = self.initial_conv(x)
+            y = y.unsqueeze(1)
+            y = self.initial_conv(y)
         loss = 0
         for layer in self.layers:
             x = layer(x)
             x = F.leaky_relu(x, 0.1)
             with torch.no_grad():
-                y = layer(x)
+                y = layer(y)
                 y = F.leaky_relu(y, 0.1)
             loss += (x - y).abs().mean()
         return loss
@@ -228,3 +229,24 @@ class Convertor(nn.Module):
         y = self.generator(z, target_speaker)
         return y
 
+
+class SpectralLoss(nn.Module):
+    def __init__(self, ws=[1024]):
+        super().__init__()
+        self.to_mels = nn.ModuleList([])
+        self.to_db = torchaudio.transforms.AmplitudeToDB()
+        for w in ws:
+            to_mel = torchaudio.transforms.MelSpectrogram(
+                    n_fft = w,
+                    n_mels = 80,
+                    sample_rate = 22050,
+                    )
+            self.to_mels.append(to_mel)
+
+    def forward(self, x, y, eps=1e-4):
+        loss = 0
+        for to_mel in self.to_mels:
+            x_mel = to_mel(x) / 100
+            y_mel = to_mel(y) / 100
+            loss += ((x_mel - y_mel) ** 2).mean()
+        return loss
