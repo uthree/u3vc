@@ -62,10 +62,10 @@ scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
 weight_rec = 10.0
 weight_con = 10.0
 weight_kl = 0.02
-weight_spe = 1.0
+weight_spe = 4.5
 
-OptC = optim.AdamW(C.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
-OptD = optim.AdamW(D.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
+OptC = optim.AdamW(C.parameters(), lr=args.learning_rate, betas=(0.8, 0.99))
+OptD = optim.AdamW(D.parameters(), lr=args.learning_rate, betas=(0.8, 0.99))
 
 Es = C.speaker_encoder
 Ec = C.content_encoder
@@ -87,7 +87,7 @@ for epoch in range(args.epoch):
             mean_src, logvar_src = Es(wave_src)
             c_src = mean_src + torch.exp(logvar_src) * torch.randn(*mean_src.shape, device=device)
             mean_tgt, logvar_tgt = Es(wave_tgt)
-            c_tgt = mean_tgt = torch.exp(logvar_src) * torch.randn(*mean_tgt.shape, device=device)
+            c_tgt = mean_tgt = torch.exp(logvar_tgt) * torch.randn(*mean_tgt.shape, device=device)
 
             # Reconstruction Loss
             z_src = Ec(wave_src)
@@ -95,7 +95,7 @@ for epoch in range(args.epoch):
 
             loss_fm = D.feature_matching_loss(rec_out, wave_src)
             loss_spe = spectral_loss(rec_out, wave_src)
-            loss_rec = loss_fm + weight_spe * loss_spe
+            loss_rec = loss_fm #+ weight_spe * loss_spe
 
             # Adversarial Loss
             convert_out = G(z_src, c_tgt)
@@ -149,4 +149,5 @@ for epoch in range(args.epoch):
             write_preview(wave_tgt[0].unsqueeze(0), './target.wav')
             write_preview(wave_src[0].unsqueeze(0), './source.wav')
             write_preview(convert_out[0].unsqueeze(0), './output.wav')
+            write_preview(rec_out[0].unsqueeze(0), './reconstruction.wav')
             print("Complete!")

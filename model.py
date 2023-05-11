@@ -6,7 +6,7 @@ import torchaudio
 
 
 class SpeakerEncoder(nn.Module):
-    def __init__(self, dim_speaker=256):
+    def __init__(self, dim_speaker=128):
         super().__init__()
         self.to_mel = torchaudio.transforms.MelSpectrogram(
                 sample_rate=22050,
@@ -14,21 +14,21 @@ class SpeakerEncoder(nn.Module):
                 n_mels=80,
                 )
         self.layers = nn.Sequential(
-                    norm(nn.Conv1d(80, 32, 3, 1, 1)),
+                    nn.Conv1d(80, 32, 3, 1, 1),
                     nn.LeakyReLU(0.1),
-                    norm(nn.Conv1d(32, 64, 3, 1, 1)),
-                    nn.LeakyReLU(0.1),
-                    nn.AvgPool1d(2),
-                    norm(nn.Conv1d(64, 128, 3, 1, 1)),
+                    nn.Conv1d(32, 64, 3, 1, 1),
                     nn.LeakyReLU(0.1),
                     nn.AvgPool1d(2),
-                    norm(nn.Conv1d(128, 256, 3, 1, 1)),
+                    nn.Conv1d(64, 128, 3, 1, 1),
                     nn.LeakyReLU(0.1),
                     nn.AvgPool1d(2),
-                    norm(nn.Conv1d(256, 512, 3, 1, 1)),
+                    nn.Conv1d(128, 256, 3, 1, 1),
+                    nn.LeakyReLU(0.1),
+                    nn.AvgPool1d(2),
+                    nn.Conv1d(256, 512, 3, 1, 1),
                     nn.LeakyReLU(0.1),
                     )
-        self.to_speaker = norm(nn.Conv1d(512, dim_speaker * 2, 1, 1, 0))
+        self.to_speaker = nn.Conv1d(512, dim_speaker * 2, 1, 1, 0)
 
     def forward(self, x):
         x = self.to_mel(x)
@@ -40,9 +40,9 @@ class SpeakerEncoder(nn.Module):
 class ContentEncoderResBlock(nn.Module):
     def __init__(self, channels):
         super().__init__()
-        self.conv1 = norm(nn.Conv1d(channels, channels, 5, 1, 2))
+        self.conv1 = nn.Conv1d(channels, channels, 5, 1, 2)
         self.relu1 = nn.LeakyReLU(0.1)
-        self.conv2 = norm(nn.Conv1d(channels, channels, 5, 1, 2))
+        self.conv2 = nn.Conv1d(channels, channels, 5, 1, 2)
         self.relu2 = nn.LeakyReLU(0.1)
 
     def forward(self, x):
@@ -52,10 +52,10 @@ class ContentEncoderResBlock(nn.Module):
 class MRFResBlock(nn.Module):
     def __init__(self, channels, kernel_size=3, dilation=1):
         super().__init__()
-        self.c1 = norm(nn.Conv1d(channels, channels, kernel_size, 1, 
-                            padding='same', dilation=dilation))
-        self.c2 = norm(nn.Conv1d(channels, channels, kernel_size, 1,
-                            padding='same', dilation=dilation))
+        self.c1 = nn.Conv1d(channels, channels, kernel_size, 1, 
+                            padding='same', dilation=dilation)
+        self.c2 = nn.Conv1d(channels, channels, kernel_size, 1,
+                            padding='same', dilation=dilation)
         self.act1 = nn.LeakyReLU(0.1)
         self.act2 = nn.LeakyReLU(0.1)
 
@@ -65,30 +65,26 @@ class MRFResBlock(nn.Module):
         return x
 
 
-class MRF(nn.Module):
-    def __init__(self, channels, kernel_sizes=[7, 7, 7], dilations=[1, 2, 3]):
-        super().__init__()
-        self.blocks = nn.ModuleList([])
-        for d, k in zip(dilations, kernel_sizes):
-            self.blocks.append(MRFResBlock(channels, k, d))
-
-    def forward(self, x):
-        output = 0
-        for block in self.blocks:
-            output = output + block(x)
-        return output
-
 
 class GeneratorResBlock(nn.Module):
-    def __init__(self, channels, condition_channels=256, kernel_sizes=[7, 7, 7], dilations=[1, 2, 3]):
+    def __init__(self, channels, condition_channels=128):
         super().__init__()
-        self.condition_conv = norm(nn.Conv1d(condition_channels, channels, 1, 1, 0))
-        self.mrf = MRF(channels, kernel_sizes, dilations)
+        self.to_mu1 = nn.Conv1d(condition_channels, channels, 1, 1, 0)
+        self.to_sigma1 = nn.Conv1d(condition_channels, channels, 1, 1, 0)
+        self.to_mu2 = nn.Conv1d(condition_channels, channels, 1, 1, 0)
+        self.to_sigma2 = nn.Conv1d(condition_channels, channels, 1, 1, 0)
+        self.conv1 = nn.Conv1d(channels, channels, 5, 1, 2)
+        self.conv2 = nn.Conv1d(channels, channels, 5, 1, 2)
+        self.act1 = nn.LeakyReLU(0.1)
+        self.act2 = nn.LeakyReLU(0.1)
 
     def forward(self, x, c):
-        x = x * torch.sigmoid(self.condition_conv(c))
-        x = self.mrf(x)
-        return x
+        res = x
+        x = x * self.to_sigma1(c) + self.to_mu1(c)
+        x = self.act1(self.conv1(x))
+        x = x * self.to_sigma2(c) + self.to_mu2(c)
+        x = self.act2(self.conv2(x))
+        return x + res
 
 
 class ContentEncoderResStack(nn.Module):
@@ -107,15 +103,12 @@ class ContentEncoderResStack(nn.Module):
 class GeneratorResStack(nn.Module):
     def __init__(self,
             channels,
-            condition_channels=256,
-            num_layers=3,
-            kernel_sizes = [7, 7, 7],
-            dilations = [1, 2, 3]):
+            condition_channels=128,
+            num_layers=3):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
-            self.layers.append(GeneratorResBlock(channels, condition_channels,
-                kernel_sizes=kernel_sizes, dilations=dilations))
+            self.layers.append(GeneratorResBlock(channels, condition_channels))
 
     def forward(self, x, c):
         for layer in self.layers:
@@ -126,16 +119,16 @@ class GeneratorResStack(nn.Module):
 class ContentEncoder(nn.Module):
     def __init__(self, dim_content=4):
         super().__init__()
-        self.initial_conv = norm(nn.Conv1d(1, 32, 7, 1, 3))
+        self.initial_conv = nn.Conv1d(1, 32, 7, 1, 3)
         self.c1 = ContentEncoderResStack(32)
-        self.d1 = norm(nn.Conv1d(32, 64, 4, 2, 1))
+        self.d1 = nn.Conv1d(32, 64, 4, 2, 1)
         self.c2 = ContentEncoderResStack(64)
-        self.d2 = norm(nn.Conv1d(64, 128, 4, 2, 1))
+        self.d2 = nn.Conv1d(64, 128, 4, 2, 1)
         self.c3 = ContentEncoderResStack(128)
-        self.d3 = norm(nn.Conv1d(128, 256, 16, 8, 4))
+        self.d3 = nn.Conv1d(128, 256, 16, 8, 4)
         self.c4 = ContentEncoderResStack(256)
-        self.d4 = norm(nn.Conv1d(256, 256, 16, 8, 4))
-        self.last_conv = norm(nn.Conv1d(256, dim_content, 7, 1, 3))
+        self.d4 = nn.Conv1d(256, 256, 16, 8, 4)
+        self.last_conv = nn.Conv1d(256, dim_content, 7, 1, 3)
 
     def forward(self, x):
         # x: [batch, len]
@@ -157,16 +150,19 @@ class ContentEncoder(nn.Module):
 class Generator(nn.Module):
     def __init__(self, dim_content=4):
         super().__init__()
-        self.initial_conv = norm(nn.Conv1d(dim_content, 256, 7, 1, 3))
-        self.u1 = norm(nn.ConvTranspose1d(256, 256, 4, 2, 1))
+        self.initial_conv = nn.Conv1d(dim_content, 256, 7, 1, 3)
+        self.u1 = nn.ConvTranspose1d(256, 256, 4, 2, 1)
         self.c1 = GeneratorResStack(256)
-        self.u2 = norm(nn.ConvTranspose1d(256, 128, 4, 2, 1))
+        self.u2 = nn.ConvTranspose1d(256, 128, 4, 2, 1)
         self.c2 = GeneratorResStack(128)
-        self.u3 = norm(nn.ConvTranspose1d(128, 64, 16, 8, 4))
+        self.u3 = nn.ConvTranspose1d(128, 64, 16, 8, 4)
         self.c3 = GeneratorResStack(64)
-        self.u4 = norm(nn.ConvTranspose1d(64, 32, 16, 8, 4))
+        self.u4 = nn.ConvTranspose1d(64, 32, 16, 8, 4)
         self.c4 = GeneratorResStack(32)
-        self.last_conv = norm(nn.Conv1d(32, 1, 7, 1, 3))
+        self.last_conv = nn.Sequential(
+                nn.Conv1d(32, 32, 7, 1, 3),
+                nn.LeakyReLU(0.1),
+                nn.Conv1d(32, 1, 7, 1, 3))
 
     def forward(self, x, c):
         x = self.initial_conv(x)
@@ -258,7 +254,7 @@ class SubDiscriminatorP(nn.Module):
                  groups = []
                  ):
         super().__init__()
-        self.input_layer = nn.utils.spectral_norm(
+        self.input_layer = norm(
                 nn.Conv2d(1, channels, (kernel_size, 1), (stride, 1), 0))
         self.layers = nn.Sequential()
         for i in range(num_stages):
@@ -266,22 +262,22 @@ class SubDiscriminatorP(nn.Module):
             c_next = channels * (2 ** (i+1))
             if i == (num_stages - 1):
                 self.layers.append(
-                        nn.utils.spectral_norm(
+                        norm(
                             nn.Conv2d(c, c, (kernel_size, 1), (stride, 1), groups=groups[i])))
             else:
                 self.layers.append(
-                        nn.utils.spectral_norm(
+                        norm(
                             nn.Conv2d(c, c_next, (kernel_size, 1), (stride, 1), groups=groups[i])))
                 self.layers.append(
                         nn.Dropout(dropout_rate))
                 self.layers.append(
                         nn.LeakyReLU(0.2))
         c = channels * (2 ** (num_stages-1))
-        self.final_conv = nn.utils.spectral_norm(
+        self.final_conv = norm(
                 nn.Conv2d(c, c, (5, 1), 1, 0)
                 )
         self.final_relu = nn.LeakyReLU(0.1)
-        self.output_layer = nn.utils.spectral_norm(
+        self.output_layer = norm(
                 nn.Conv2d(c, 1, (3, 1), 1, 0))
         self.period = period
 
@@ -388,25 +384,31 @@ class Convertor(nn.Module):
         return y
 
 
-class SpectralLoss(nn.Module):
-    def __init__(self, ws=[2048, 1024, 512]):
+class MelLoss(nn.Module):
+    def __init__(self, sample_rate=22050, n_fft=1024, n_mels=80, normalized=True):
         super().__init__()
-        self.to_mels = nn.ModuleList([])
-        for w in ws:
-            to_mel = torchaudio.transforms.MelSpectrogram(
-                    n_fft = w,
-                    n_mels = 80,
-                    sample_rate = 22050,
-                    )
-            self.to_mels.append(to_mel)
+        self.to_mel = torchaudio.transforms.MelSpectrogram(sample_rate,
+                                                           n_mels=n_mels,
+                                                           n_fft=n_fft,
+                                                           normalized=normalized,
+                                                           hop_length=256)
 
-    def forward(self, x, y, eps=1e-4):
+    def forward(self, fake, real):
+        self.to_mel = self.to_mel.to(real.device)
+        with torch.no_grad():
+            real_mel = self.to_mel(real)
+        return F.l1_loss(self.to_mel(fake), real_mel)
+
+
+class SpectralLoss(nn.Module):
+    def __init__(self, ws=[512, 1024, 2048]):
+        super().__init__()
+        self.mel_losses = nn.ModuleList([])
+        for w in ws:
+            self.mel_losses.append(MelLoss(n_fft=w))
+
+    def forward(self, fake, real):
         loss = 0
-        for to_mel in self.to_mels:
-            x_mel = torch.log10(to_mel(x).abs() + eps)
-            y_mel = torch.log10(to_mel(y).abs() + eps)
-            l = ((x_mel - y_mel) ** 2).mean() / len(self.to_mels)
-            if torch.any(l.isinf()) or torch.any(l.isnan()):
-                l = torch.tensor(0., device=x.device)
-            loss += l
+        for mel_loss in self.mel_losses:
+            loss += mel_loss(fake, real) / len(self.mel_losses)
         return loss
