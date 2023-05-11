@@ -368,7 +368,7 @@ class Convertor(nn.Module):
 
 
 class MelLoss(nn.Module):
-    def __init__(self, sample_rate=22050, n_fft=1024, n_mels=80, normalized=True):
+    def __init__(self, sample_rate=22050, n_fft=1024, n_mels=80, normalized=False):
         super().__init__()
         self.to_mel = torchaudio.transforms.MelSpectrogram(sample_rate,
                                                            n_mels=n_mels,
