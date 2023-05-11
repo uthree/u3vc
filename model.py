@@ -159,12 +159,12 @@ class SubDiscriminator(nn.Module):
         self.pool = nn.AvgPool1d(pool)
         self.initial_conv = norm(nn.Conv1d(1, 32, 7, 1, 3))
         self.layers = nn.ModuleList([
-            norm(nn.Conv1d(32, 32, 16, 2)),
-            norm(nn.Conv1d(32, 32, 16, 2)),
-            norm(nn.Conv1d(32, 64, 16, 4)),
-            norm(nn.Conv1d(64, 64, 32, 4)),
-            norm(nn.Conv1d(64, 64, 32, 8)),
-            norm(nn.Conv1d(64, 64, 32, 8)),
+            norm(nn.Conv1d(32, 32, 41, 2)),
+            norm(nn.Conv1d(32, 32, 41, 2)),
+            norm(nn.Conv1d(32, 64, 41, 4)),
+            norm(nn.Conv1d(64, 64, 41, 4)),
+            norm(nn.Conv1d(64, 64, 41, 4)),
+            norm(nn.Conv1d(64, 64, 41, 4)),
             ])
         self.output_layer = norm(nn.Conv1d(64, 1, 7, 1, 3))
 
@@ -233,7 +233,7 @@ class Convertor(nn.Module):
 
 
 class SpectralLoss(nn.Module):
-    def __init__(self, ws=[1024]):
+    def __init__(self, ws=[2048, 1024]):
         super().__init__()
         self.to_mels = nn.ModuleList([])
         self.to_db = torchaudio.transforms.AmplitudeToDB()
@@ -242,13 +242,14 @@ class SpectralLoss(nn.Module):
                     n_fft = w,
                     n_mels = 80,
                     sample_rate = 22050,
+                    normalized = True
                     )
             self.to_mels.append(to_mel)
 
     def forward(self, x, y, eps=1e-4):
         loss = 0
         for to_mel in self.to_mels:
-            x_mel = to_mel(x) / 100
-            y_mel = to_mel(y) / 100
+            x_mel = to_mel(x)
+            y_mel = to_mel(y)
             loss += ((x_mel - y_mel) ** 2).mean()
         return loss
