@@ -137,7 +137,12 @@ for epoch in range(args.epoch):
 
         N = wave.shape[0]
         bar.update(N)
-    save_models(C, D)
-    write_preview(wave_tgt[0].unsqueeze(0), './target.wav')
-    write_preview(wave_src[0].unsqueeze(0), './source.wav')
-    write_preview(convert_out[0].unsqueeze(0), './output.wav')
+        if batch % 100 == 0:
+            print("Saving Models...")
+            save_models(C, D)
+            print("Complete!")
+            print("Writing Previews")
+            write_preview(wave_tgt[0].unsqueeze(0), './target.wav')
+            write_preview(wave_src[0].unsqueeze(0), './source.wav')
+            write_preview(convert_out[0].unsqueeze(0), './output.wav')
+            print("Complete!")

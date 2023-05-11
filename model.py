@@ -58,7 +58,7 @@ class GeneratorResBlock(nn.Module):
 
     def forward(self, x, c):
         res = x
-        x = x * self.condition_conv(c)
+        x = x * torch.sigmoid(self.condition_conv(c))
         x = self.conv1(x)
         x = self.relu(x)
         x = self.conv2(x)
@@ -147,9 +147,9 @@ class Generator(nn.Module):
         x = self.u4(x)
         x = self.c4(x, c)
         x = self.last_conv(x)
-        x = torch.tanh(x)
         x = x.squeeze(1)
         # [batch, 1, len] -> [batch, len]
+        x = torch.tanh(x)
         return x
 
 
@@ -159,9 +159,9 @@ class SubDiscriminator(nn.Module):
         self.pool = nn.AvgPool1d(pool)
         self.initial_conv = norm(nn.Conv1d(1, 32, 7, 1, 3))
         self.layers = nn.ModuleList([
-            norm(nn.Conv1d(32, 32, 41, 2)),
-            norm(nn.Conv1d(32, 32, 41, 2)),
-            norm(nn.Conv1d(32, 64, 41, 4)),
+            norm(nn.Conv1d(32, 64, 41, 2)),
+            norm(nn.Conv1d(64, 64, 41, 2)),
+            norm(nn.Conv1d(64, 64, 41, 4)),
             norm(nn.Conv1d(64, 64, 41, 4)),
             norm(nn.Conv1d(64, 64, 41, 4)),
             norm(nn.Conv1d(64, 64, 41, 4)),
@@ -209,7 +209,7 @@ class Discriminator(nn.Module):
         return out
 
     def feature_matching_loss(self, x, y):
-        loss = 0
+        loss = (x - y).abs().mean()
         for d in self.sub_discriminators:
             loss += d.feature_matching_loss(x, y)
         return loss
@@ -233,23 +233,23 @@ class Convertor(nn.Module):
 
 
 class SpectralLoss(nn.Module):
-    def __init__(self, ws=[2048, 1024]):
+    def __init__(self, ws=[2048, 1024, 512]):
         super().__init__()
         self.to_mels = nn.ModuleList([])
-        self.to_db = torchaudio.transforms.AmplitudeToDB()
         for w in ws:
             to_mel = torchaudio.transforms.MelSpectrogram(
                     n_fft = w,
                     n_mels = 80,
                     sample_rate = 22050,
-                    normalized = True
                     )
             self.to_mels.append(to_mel)
 
     def forward(self, x, y, eps=1e-4):
         loss = 0
         for to_mel in self.to_mels:
-            x_mel = to_mel(x)
-            y_mel = to_mel(y)
+            x_mel = torch.tanh(to_mel(x))
+            y_mel = torch.tanh(to_mel(y))
             loss += ((x_mel - y_mel) ** 2).mean()
+        if torch.any(loss.isinf()) or torch.any(loss.isnan()):
+            loss = torch.tensor(0, device=x.device)
         return loss
