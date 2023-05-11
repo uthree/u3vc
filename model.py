@@ -159,12 +159,14 @@ class SubDiscriminator(nn.Module):
         self.pool = nn.AvgPool1d(pool)
         self.initial_conv = norm(nn.Conv1d(1, 32, 7, 1, 3))
         self.layers = nn.ModuleList([
-            norm(nn.Conv1d(32, 64, 4, 2, 1)),
-            norm(nn.Conv1d(64, 96, 4, 2, 1)),
-            norm(nn.Conv1d(96, 128, 16, 8, 4)),
-            norm(nn.Conv1d(128, 128, 16, 8, 4)),
+            norm(nn.Conv1d(32, 32, 16, 2)),
+            norm(nn.Conv1d(32, 32, 16, 2)),
+            norm(nn.Conv1d(32, 64, 16, 4)),
+            norm(nn.Conv1d(64, 64, 32, 4)),
+            norm(nn.Conv1d(64, 64, 32, 8)),
+            norm(nn.Conv1d(64, 64, 32, 8)),
             ])
-        self.output_layer = norm(nn.Conv1d(128, 1, 7, 1, 3))
+        self.output_layer = norm(nn.Conv1d(64, 1, 7, 1, 3))
 
     def forward(self, x):
         # [batch, len] -> [batch, 1, len]
