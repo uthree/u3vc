@@ -41,11 +41,12 @@ class ContentEncoderResBlock(nn.Module):
     def __init__(self, channels):
         super().__init__()
         self.conv1 = norm(nn.Conv1d(channels, channels, 5, 1, 2))
-        self.relu = nn.LeakyReLU(0.1)
+        self.relu1 = nn.LeakyReLU(0.1)
         self.conv2 = norm(nn.Conv1d(channels, channels, 5, 1, 2))
+        self.relu2 = nn.LeakyReLU(0.1)
 
     def forward(self, x):
-        return self.conv2(self.relu(self.conv1(x))) + x
+        return self.relu2(self.conv2(self.relu1(self.conv1(x)))) + x
 
 
 class MRFResBlock(nn.Module):
@@ -79,10 +80,10 @@ class MRF(nn.Module):
 
 
 class GeneratorResBlock(nn.Module):
-    def __init__(self, channels, condition_channels=256):
+    def __init__(self, channels, condition_channels=256, kernel_sizes=[3, 5, 7], dilations=[1, 2, 3]):
         super().__init__()
         self.condition_conv = norm(nn.Conv1d(condition_channels, channels, 1, 1, 0))
-        self.mrf = MRF(channels)
+        self.mrf = MRF(channels, kernel_sizes, dilations)
 
     def forward(self, x, c):
         res = x
@@ -92,7 +93,7 @@ class GeneratorResBlock(nn.Module):
 
 
 class ContentEncoderResStack(nn.Module):
-    def __init__(self, channels, num_layers=3):
+    def __init__(self, channels, num_layers=2):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
@@ -105,7 +106,12 @@ class ContentEncoderResStack(nn.Module):
 
 
 class GeneratorResStack(nn.Module):
-    def __init__(self, channels, condition_channels=256, num_layers=1):
+    def __init__(self,
+            channels,
+            condition_channels=256,
+            num_layers=2,
+            kernel_sizes = [3, 5, 7],
+            dilations = [1, 2, 3]):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
