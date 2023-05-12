@@ -22,6 +22,10 @@ parser.add_argument('-lr', '--learning-rate', default=1e-4, type=float)
 parser.add_argument('-len', '--length', default=65536, type=int)
 parser.add_argument('-m', '--max-data', default=-1, type=int)
 parser.add_argument('-fp16', default=False, type=bool)
+parser.add_argument('--kl', default=0.02, type=float)
+parser.add_argument('--spe', default=1.0, type=float)
+parser.add_argument('--rec', default=10.0, type=float)
+parser.add_argument('--con', default=10.0, type=float)
 
 args = parser.parse_args()
 
@@ -59,10 +63,10 @@ dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size*2, shuffle=True)
 
 scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
 
-weight_rec = 10.0
-weight_con = 10.0
-weight_kl = 0.02
-weight_spe = 1.0
+weight_rec = args.rec
+weight_con = args.con
+weight_kl = args.kl
+weight_spe = args.spe
 
 OptC = optim.AdamW(C.parameters(), lr=args.learning_rate, betas=(0.5, 0.9))
 OptD = optim.AdamW(D.parameters(), lr=args.learning_rate, betas=(0.5, 0.9))
