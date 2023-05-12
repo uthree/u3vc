@@ -23,7 +23,7 @@ parser.add_argument('-len', '--length', default=65536, type=int)
 parser.add_argument('-m', '--max-data', default=-1, type=int)
 parser.add_argument('-fp16', default=False, type=bool)
 
-args= parser.parse_args()
+args = parser.parse_args()
 
 def load_or_init_models(device=torch.device('cpu')):
     C = Convertor().to(device)
@@ -62,10 +62,10 @@ scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
 weight_rec = 10.0
 weight_con = 10.0
 weight_kl = 0.02
-weight_spe = 4.5
+weight_spe = 1.0
 
-OptC = optim.AdamW(C.parameters(), lr=args.learning_rate, betas=(0.8, 0.99))
-OptD = optim.AdamW(D.parameters(), lr=args.learning_rate, betas=(0.8, 0.99))
+OptC = optim.AdamW(C.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
+OptD = optim.AdamW(D.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
 
 Es = C.speaker_encoder
 Ec = C.content_encoder
@@ -111,7 +111,8 @@ for epoch in range(args.epoch):
                 param.requires_grad = True
 
             # KL Loss
-            loss_kl = (-1 - logvar_src + torch.exp(logvar_src) + mean_src ** 2).mean()
+            loss_kl = (-1 - logvar_src + torch.exp(logvar_src) + mean_src ** 2).mean() +\
+                    (-1 - logvar_tgt + torch.exp(logvar_tgt) + mean_tgt ** 2).mean()
 
             # Final Loss
             loss_convertor = loss_adv + weight_rec * loss_rec + weight_con * loss_con + weight_kl * loss_kl
@@ -128,7 +129,7 @@ for epoch in range(args.epoch):
             for logit in D.logits(convert_out):
                 loss_d += ((logit - 1) ** 2).mean()
             for logit in D.logits(wave_src):
-                loss_d += ((logit) ** 2).mean()
+                loss_d += (logit ** 2).mean()
 
         scaler.scale(loss_d).backward()
         torch.nn.utils.clip_grad_norm_(D.parameters(), 1.0)

@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils.spectral_norm as norm
+import torch.nn.utils.weight_norm as wn
 import torchaudio
 
 
@@ -40,38 +41,35 @@ class SpeakerEncoder(nn.Module):
 class ContentEncoderResBlock(nn.Module):
     def __init__(self, channels):
         super().__init__()
-        self.conv1 = nn.Conv1d(channels, channels, 5, 1, 2)
-        self.relu1 = nn.LeakyReLU(0.1)
-        self.conv2 = nn.Conv1d(channels, channels, 5, 1, 2)
-        self.relu2 = nn.LeakyReLU(0.1)
+        self.input_conv = wn(nn.Conv1d(channels, channels, 3, 1, 1))
+        self.res_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.output_conv = wn(nn.Conv1d(channels, channels, 1, 1))
 
     def forward(self, x):
-        return self.relu2(self.conv2(self.relu1(self.conv1(x)))) + x
+        res = self.res_conv(x)
+        x = self.input_conv(x)
+        x = torch.tanh(x) * torch.sigmoid(x)
+        x = self.output_conv(x)
+        return x + res
 
 
 class GeneratorResBlock(nn.Module):
     def __init__(self, channels, condition_channels=128):
         super().__init__()
-        self.to_mu1 = nn.Conv1d(condition_channels, channels, 1, 1, 0)
-        self.to_sigma1 = nn.Conv1d(condition_channels, channels, 1, 1, 0)
-        self.to_mu2 = nn.Conv1d(condition_channels, channels, 1, 1, 0)
-        self.to_sigma2 = nn.Conv1d(condition_channels, channels, 1, 1, 0)
-        self.conv1 = nn.Conv1d(channels, channels, 5, 1, 2)
-        self.conv2 = nn.Conv1d(channels, channels, 5, 1, 2)
-        self.act1 = nn.LeakyReLU(0.1)
-        self.act2 = nn.LeakyReLU(0.1)
+        self.input_conv = wn(nn.Conv1d(channels, channels, 3, 1, 1))
+        self.condition_conv = wn(nn.Conv1d(condition_channels, channels, 1, 1, 0))
+        self.output_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.res_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
 
     def forward(self, x, c):
-        res = x
-        x = x * self.to_sigma1(c) + self.to_mu1(c)
-        x = self.act1(self.conv1(x))
-        x = x * self.to_sigma2(c) + self.to_mu2(c)
-        x = self.act2(self.conv2(x))
+        res = self.res_conv(x)
+        x = self.input_conv(x) + self.condition_conv(c)
+        x = torch.tanh(x) * torch.sigmoid(x)
+        x = self.output_conv(x)
         return x + res
 
-
 class ContentEncoderResStack(nn.Module):
-    def __init__(self, channels, num_layers=3):
+    def __init__(self, channels, num_layers=4):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
@@ -87,7 +85,7 @@ class GeneratorResStack(nn.Module):
     def __init__(self,
             channels,
             condition_channels=128,
-            num_layers=3):
+            num_layers=4):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
@@ -134,13 +132,13 @@ class Generator(nn.Module):
     def __init__(self, dim_content=4):
         super().__init__()
         self.initial_conv = nn.Conv1d(dim_content, 256, 7, 1, 3)
-        self.u1 = nn.ConvTranspose1d(256, 256, 4, 2, 1)
+        self.u1 = nn.ConvTranspose1d(256, 256, 16, 8, 4)
         self.c1 = GeneratorResStack(256)
-        self.u2 = nn.ConvTranspose1d(256, 128, 4, 2, 1)
+        self.u2 = nn.ConvTranspose1d(256, 128, 16, 8, 4)
         self.c2 = GeneratorResStack(128)
-        self.u3 = nn.ConvTranspose1d(128, 64, 16, 8, 4)
+        self.u3 = nn.ConvTranspose1d(128, 64, 4, 2, 1)
         self.c3 = GeneratorResStack(64)
-        self.u4 = nn.ConvTranspose1d(64, 32, 16, 8, 4)
+        self.u4 = nn.ConvTranspose1d(64, 32, 4, 2, 1)
         self.c4 = GeneratorResStack(32)
         self.last_conv = nn.Sequential(
                 nn.Conv1d(32, 32, 7, 1, 3),
@@ -220,7 +218,7 @@ class DiscriminatorS(nn.Module):
         return out
 
     def feature_matching_loss(self, x, y):
-        loss = (x - y).abs().mean()
+        loss = 0
         for d in self.sub_discriminators:
             loss += d.feature_matching_loss(x, y)
         return loss
@@ -393,5 +391,5 @@ class SpectralLoss(nn.Module):
     def forward(self, fake, real):
         loss = 0
         for mel_loss in self.mel_losses:
-            loss += mel_loss(fake, real)
+            loss += mel_loss(fake, real) / len(self.mel_losses)
         return loss
