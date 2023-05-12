@@ -41,32 +41,22 @@ class SpeakerEncoder(nn.Module):
 class ContentEncoderResBlock(nn.Module):
     def __init__(self, channels):
         super().__init__()
-        self.input_conv = wn(nn.Conv1d(channels, channels, 3, 1, 1))
-        self.res_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
-        self.output_conv = wn(nn.Conv1d(channels, channels, 1, 1))
+        self.input_conv = wn(nn.Conv1d(channels, channels, 5, 1, 2))
+        self.act = nn.LeakyReLU(0.1)
 
     def forward(self, x):
-        res = self.res_conv(x)
-        x = self.input_conv(x)
-        x = torch.tanh(x) * torch.sigmoid(x)
-        x = self.output_conv(x)
-        return x + res
+        return self.act(self.input_conv(x)) + x
 
 
 class GeneratorResBlock(nn.Module):
     def __init__(self, channels, condition_channels=128):
         super().__init__()
-        self.input_conv = wn(nn.Conv1d(channels, channels, 3, 1, 1))
+        self.input_conv = wn(nn.Conv1d(channels, channels, 5, 1, 2))
         self.condition_conv = wn(nn.Conv1d(condition_channels, channels, 1, 1, 0))
-        self.output_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
-        self.res_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.act = nn.LeakyReLU(0.1)
 
     def forward(self, x, c):
-        res = self.res_conv(x)
-        x = self.input_conv(x) + self.condition_conv(c)
-        x = torch.tanh(x) * torch.sigmoid(x)
-        x = self.output_conv(x)
-        return x + res
+        return self.act(self.input_conv(x) * self.condition_conv(c)) + x
 
 class ContentEncoderResStack(nn.Module):
     def __init__(self, channels, num_layers=4):

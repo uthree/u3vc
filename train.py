@@ -85,20 +85,20 @@ for epoch in range(args.epoch):
 
             # Encode Speaker
             mean_src, logvar_src = Es(wave_src)
-            c_src = mean_src + torch.exp(logvar_src) * torch.randn(*mean_src.shape, device=device)
+            z_src = mean_src + torch.exp(logvar_src) * torch.randn(*mean_src.shape, device=device)
             mean_tgt, logvar_tgt = Es(wave_tgt)
-            c_tgt = mean_tgt = torch.exp(logvar_tgt) * torch.randn(*mean_tgt.shape, device=device)
+            z_tgt = mean_tgt = torch.exp(logvar_tgt) * torch.randn(*mean_tgt.shape, device=device)
 
             # Reconstruction Loss
-            z_src = Ec(wave_src)
-            rec_out = G(z_src, c_src)
+            c_src = Ec(wave_src)
+            rec_out = G(c_src, z_src)
 
             loss_fm = D.feature_matching_loss(rec_out, wave_src)
             loss_spe = spectral_loss(rec_out, wave_src)
-            loss_rec = loss_fm #+ weight_spe * loss_spe
+            loss_rec = loss_fm + weight_spe * loss_spe
 
             # Adversarial Loss
-            convert_out = G(z_src, c_tgt)
+            convert_out = G(c_src, z_tgt)
             loss_adv = 0
             for logit in D.logits(convert_out):
                 loss_adv += (logit ** 2).mean()
