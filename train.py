@@ -19,7 +19,7 @@ parser.add_argument('-d', '--device', default='cpu')
 parser.add_argument('-e', '--epoch', default=1000, type=int)
 parser.add_argument('-b', '--batch-size', default=1, type=int)
 parser.add_argument('-lr', '--learning-rate', default=1e-4, type=float)
-parser.add_argument('-len', '--length', default=65536, type=int)
+parser.add_argument('-len', '--length', default=32768, type=int)
 parser.add_argument('-m', '--max-data', default=-1, type=int)
 parser.add_argument('-fp16', default=False, type=bool)
 
@@ -64,8 +64,8 @@ weight_con = 10.0
 weight_kl = 0.02
 weight_spe = 1.0
 
-OptC = optim.AdamW(C.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
-OptD = optim.AdamW(D.parameters(), lr=args.learning_rate, betas=(0.5, 0.999))
+OptC = optim.AdamW(C.parameters(), lr=args.learning_rate, betas=(0.5, 0.9))
+OptD = optim.AdamW(D.parameters(), lr=args.learning_rate, betas=(0.5, 0.9))
 
 Es = C.speaker_encoder
 Ec = C.content_encoder
