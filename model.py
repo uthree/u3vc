@@ -165,17 +165,25 @@ class SubDiscriminatorS(nn.Module):
             norm(nn.Conv1d(64, 64, 41, 4)),
             norm(nn.Conv1d(64, 64, 41, 4)),
             ])
-        self.output_layer = norm(nn.Conv1d(64, 1, 7, 1, 3))
+        self.output_layers = nn.ModuleList([
+                norm(nn.Conv1d(64, 1, 1, 1, 0)),
+                norm(nn.Conv1d(64, 1, 1, 1, 0)),
+                norm(nn.Conv1d(64, 1, 1, 1, 0)),
+                norm(nn.Conv1d(64, 1, 1, 1, 0)),
+                norm(nn.Conv1d(64, 1, 1, 1, 0)),
+                norm(nn.Conv1d(64, 1, 1, 1, 0)),
+            ])
 
-    def forward(self, x):
+    def logits(self, x):
         # [batch, len] -> [batch, 1, len]
+        logits = []
         x = x.unsqueeze(1)
         x = self.initial_conv(x)
-        for layer in self.layers:
+        for layer, to_out in zip(self.layers, self.output_layers):
             x = layer(x)
             x = F.leaky_relu(x, 0.1)
-        x = self.output_layer(x)
-        return x
+            logits.append(to_out(x))
+        return logits
 
     def feature_matching_loss(self, x, y):
         x = x.unsqueeze(1)
@@ -204,7 +212,7 @@ class DiscriminatorS(nn.Module):
     def logits(self, x):
         out = []
         for d in self.sub_discriminators:
-            out.append(d(x))
+            out += d.logits(x)
         return out
 
     def feature_matching_loss(self, x, y):

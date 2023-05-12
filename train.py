@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser(description="run training")
 parser.add_argument('dataset')
 parser.add_argument('-d', '--device', default='cpu')
 parser.add_argument('-e', '--epoch', default=1000, type=int)
-parser.add_argument('-b', '--batch-size', default=1, type=int)
+parser.add_argument('-b', '--batch-size', default=4, type=int)
 parser.add_argument('-lr', '--learning-rate', default=1e-4, type=float)
 parser.add_argument('-len', '--length', default=65536, type=int)
 parser.add_argument('-m', '--max-data', default=-1, type=int)
@@ -100,6 +100,8 @@ for epoch in range(args.epoch):
             # Adversarial Loss
             convert_out = G(c_src, z_tgt)
             loss_adv = 0
+            for logit in D.logits(rec_out):
+                loss_adv += (logit ** 2).mean()
             for logit in D.logits(convert_out):
                 loss_adv += (logit ** 2).mean()
 
@@ -123,10 +125,13 @@ for epoch in range(args.epoch):
         
         # Train Discriminator
         convert_out = convert_out.detach()
+        rec_out = rec_out.detach()
         OptD.zero_grad()
         with torch.cuda.amp.autocast(enabled=args.fp16):
             loss_d = 0
             for logit in D.logits(convert_out):
+                loss_d += ((logit - 1) ** 2).mean()
+            for logit in D.logits(rec_out):
                 loss_d += ((logit - 1) ** 2).mean()
             for logit in D.logits(wave_src):
                 loss_d += (logit ** 2).mean()
