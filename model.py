@@ -6,6 +6,17 @@ import torch.nn.utils.weight_norm as wn
 import torchaudio
 
 
+class SpeakerEncoderResBlock(nn.Module):
+    def __init__(self, channels=32):
+        super().__init__()
+        self.conv1 = nn.Conv1d(channels, channels, 5, 1, 2)
+        self.conv2 = nn.Conv1d(channels, channels, 5, 1, 2)
+        self.act = nn.LeakyReLU(0.1)
+    
+    def forward(self, x):
+        return self.conv2(self.act(self.conv1(x))) + x
+
+
 class SpeakerEncoder(nn.Module):
     def __init__(self, dim_speaker=128):
         super().__init__()
@@ -16,18 +27,14 @@ class SpeakerEncoder(nn.Module):
                 )
         self.layers = nn.Sequential(
                     nn.Conv1d(80, 32, 3, 1, 1),
-                    nn.LeakyReLU(0.1),
-                    nn.Conv1d(32, 64, 3, 1, 1),
-                    nn.LeakyReLU(0.1),
-                    nn.AvgPool1d(2),
-                    nn.Conv1d(64, 128, 3, 1, 1),
-                    nn.LeakyReLU(0.1),
-                    nn.AvgPool1d(2),
-                    nn.Conv1d(128, 256, 3, 1, 1),
-                    nn.LeakyReLU(0.1),
-                    nn.AvgPool1d(2),
-                    nn.Conv1d(256, 512, 3, 1, 1),
-                    nn.LeakyReLU(0.1),
+                    SpeakerEncoderResBlock(32),
+                    nn.Conv1d(32, 64, 4, 2, 1),
+                    SpeakerEncoderResBlock(64),
+                    nn.Conv1d(64, 128, 4, 2, 1),
+                    SpeakerEncoderResBlock(128),
+                    nn.Conv1d(128, 256, 4, 2, 1),
+                    SpeakerEncoderResBlock(256),
+                    nn.Conv1d(256, 512, 4, 2, 1)
                     )
         self.to_speaker = nn.Conv1d(512, dim_speaker * 2, 1, 1, 0)
 
@@ -72,7 +79,7 @@ class GeneratorResBlock(nn.Module):
         
 
 class ContentEncoderResStack(nn.Module):
-    def __init__(self, channels, num_layers=4):
+    def __init__(self, channels, num_layers=2):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
@@ -88,7 +95,7 @@ class GeneratorResStack(nn.Module):
     def __init__(self,
             channels,
             condition_channels=128,
-            num_layers=4):
+            num_layers=2):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
