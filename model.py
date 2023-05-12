@@ -396,7 +396,8 @@ class MelLoss(nn.Module):
         self.to_mel = self.to_mel.to(real.device)
         with torch.no_grad():
             real_mel = self.to_mel(real)
-        return ((self.to_mel(fake) - real_mel) ** 2).mean()
+        fake_mel = self.to_mel(fake)
+        return ((fake_mel - real_mel) ** 2).mean()
 
 
 class SpectralLoss(nn.Module):
