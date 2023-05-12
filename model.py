@@ -41,22 +41,35 @@ class SpeakerEncoder(nn.Module):
 class ContentEncoderResBlock(nn.Module):
     def __init__(self, channels):
         super().__init__()
-        self.input_conv = wn(nn.Conv1d(channels, channels, 5, 1, 2))
+        self.input_conv1 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=1, padding='same'))
+        self.input_conv2 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=2, padding='same'))
+        self.input_conv3 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=3, padding='same'))
         self.act = nn.LeakyReLU(0.1)
 
     def forward(self, x):
-        return self.act(self.input_conv(x)) + x
+        o1 = self.act(self.input_conv1(x))
+        o2 = self.act(self.input_conv2(x))
+        o3 = self.act(self.input_conv3(x))
+        return o1 + o2 + o3 + x
 
 
 class GeneratorResBlock(nn.Module):
     def __init__(self, channels, condition_channels=128):
         super().__init__()
-        self.input_conv = wn(nn.Conv1d(channels, channels, 5, 1, 2))
-        self.condition_conv = wn(nn.Conv1d(condition_channels, channels, 1, 1, 0))
+        self.input_conv1 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=1, padding='same'))
+        self.condition_conv1 = wn(nn.Conv1d(condition_channels, channels, 1, 1, 0))
+        self.input_conv2 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=2, padding='same'))
+        self.condition_conv2 = wn(nn.Conv1d(condition_channels, channels, 1, 1, 0))
+        self.input_conv3 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=3, padding='same'))
+        self.condition_conv3 = wn(nn.Conv1d(condition_channels, channels, 1, 1, 0))
         self.act = nn.LeakyReLU(0.1)
 
     def forward(self, x, c):
-        return self.act(self.input_conv(x) * self.condition_conv(c)) + x
+        o1 = self.act(self.input_conv1(x)) * self.condition_conv1(c)
+        o2 = self.act(self.input_conv2(x)) * self.condition_conv2(c)
+        o3 = self.act(self.input_conv3(x)) * self.condition_conv3(c)
+        return o1 + o2 + o3 + x
+        
 
 class ContentEncoderResStack(nn.Module):
     def __init__(self, channels, num_layers=4):
