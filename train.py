@@ -110,10 +110,12 @@ for epoch in range(args.epoch):
             # Adversarial Loss
             convert_out = G(c_src, z_tgt)
             loss_adv = 0
-            for logit in D.logits(rec_out):
-                loss_adv += (logit ** 2).mean()
-            for logit in D.logits(convert_out):
-                loss_adv += (logit ** 2).mean()
+            logits = D.logits(rec_out)
+            for logit in logits:
+                loss_adv += (logit ** 2).mean() / len(logits)
+            logits = D.logits(convert_out)
+            for logit in logits:
+                loss_adv += (logit ** 2).mean() / len(logits)
 
             # Content Preservation Loss
             for param in Ec.parameters():
@@ -141,12 +143,15 @@ for epoch in range(args.epoch):
             OptD.zero_grad()
         with torch.cuda.amp.autocast(enabled=args.fp16):
             loss_d = 0
-            for logit in D.logits(convert_out):
-                loss_d += ((logit - 1) ** 2).mean()
-            for logit in D.logits(rec_out):
-                loss_d += ((logit - 1) ** 2).mean()
-            for logit in D.logits(wave_src):
-                loss_d += (logit ** 2).mean()
+            logits = D.logits(convert_out)
+            for logit in logits:
+                loss_d += ((logit - 1) ** 2).mean() / len(logits)
+            logits = D.logits(rec_out)
+            for logit in logits:
+                loss_d += ((logit - 1) ** 2).mean() / len(logits)
+            logits = D.logits(wave_src)
+            for logit in logits:
+                loss_d += (logit ** 2).mean() / len(logits)
         
         if batch % grad_acc == 0:
             scaler.scale(loss_d).backward()

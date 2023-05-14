@@ -239,7 +239,7 @@ class DiscriminatorS(nn.Module):
     def feature_matching_loss(self, x, y):
         loss = 0
         for d in self.sub_discriminators:
-            loss += d.feature_matching_loss(x, y)
+            loss += d.feature_matching_loss(x, y) / len(self.sub_discriminators)
         return loss
 
 
@@ -385,12 +385,12 @@ class Convertor(nn.Module):
 
 
 class MelLoss(nn.Module):
-    def __init__(self, sample_rate=22050, n_fft=1024, n_mels=80, normalized=True):
+    def __init__(self, sample_rate=22050, n_fft=1024, n_mels=80):
         super().__init__()
         self.to_mel = torchaudio.transforms.MelSpectrogram(sample_rate,
                                                            n_mels=n_mels,
                                                            n_fft=n_fft,
-                                                           normalized=normalized,
+                                                           normalized=True,
                                                            hop_length=256)
 
     def forward(self, fake, real):
