@@ -84,6 +84,8 @@ for epoch in range(args.epoch):
     tqdm.write(f"Epoch #{epoch}")
     bar = tqdm(total=len(ds))
     for batch, wave in enumerate(dl):
+        if wave.shape[0] % 2 != 0:
+            continue
         wave_src, wave_tgt = torch.chunk(wave.to(device), 2, dim=0)
 
         # Train Convertor.
