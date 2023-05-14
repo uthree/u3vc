@@ -19,7 +19,7 @@ parser.add_argument('-d', '--device', default='cpu')
 parser.add_argument('-e', '--epoch', default=1000, type=int)
 parser.add_argument('-b', '--batch-size', default=2, type=int)
 parser.add_argument('-lr', '--learning-rate', default=1e-4, type=float)
-parser.add_argument('-len', '--length', default=65536, type=int)
+parser.add_argument('-len', '--length', default=32768, type=int)
 parser.add_argument('-m', '--max-data', default=-1, type=int)
 parser.add_argument('-fp16', default=False, type=bool)
 parser.add_argument('--kl', default=0.02, type=float)
@@ -95,7 +95,7 @@ for epoch in range(args.epoch):
             mean_src, logvar_src = Es(wave_src)
             z_src = mean_src + torch.exp(logvar_src) * torch.randn(*mean_src.shape, device=device)
             mean_tgt, logvar_tgt = Es(wave_tgt)
-            z_tgt = mean_tgt = torch.exp(logvar_tgt) * torch.randn(*mean_tgt.shape, device=device)
+            z_tgt = mean_tgt + torch.exp(logvar_tgt) * torch.randn(*mean_tgt.shape, device=device)
 
             # Reconstruction Loss
             c_src = Ec(wave_src)

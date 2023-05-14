@@ -6,6 +6,7 @@ import torch
 import torchaudio
 from  torchaudio.functional import resample as resample
 
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from model import Convertor
@@ -45,7 +46,10 @@ for i, path in enumerate(paths):
         with torch.cuda.amp.autocast(enabled=args.fp16):
             wf = resample(wf, sr, 22050)
             wf = wf.to(device)
-            wf = convertor.convert(wf, target_speaker)
+            c = convertor.content_encoder(wf)
+            plt.imshow(c[0].cpu())
+            plt.savefig(f"./outputs/out_{i}_c.png", dpi=200)
+            wf = convertor.generator(c, target_speaker)
             wf = resample(wf, 22050, sr)
     wf = wf.to('cpu').detach()
     torchaudio.save(src=wf, sample_rate=sr, filepath=f"./outputs/out_{i}.wav")
