@@ -26,6 +26,7 @@ parser.add_argument('--kl', default=0.02, type=float)
 parser.add_argument('--spe', default=1.0, type=float)
 parser.add_argument('--rec', default=10.0, type=float)
 parser.add_argument('--con', default=10.0, type=float)
+parser.add_argument('-gacc', '--gradient-accumulation', default=8, type=int)
 
 args = parser.parse_args()
 
@@ -77,6 +78,8 @@ G = C.generator
 
 spectral_loss = SpectralLoss().to(device)
 
+grad_acc = args.gradient_accumulation
+
 for epoch in range(args.epoch):
     tqdm.write(f"Epoch #{epoch}")
     bar = tqdm(total=len(ds))
@@ -84,7 +87,8 @@ for epoch in range(args.epoch):
         wave_src, wave_tgt = torch.chunk(wave.to(device), 2, dim=0)
 
         # Train Convertor.
-        OptC.zero_grad()
+        if batch % grad_acc == 0:
+            OptC.zero_grad()
         with torch.cuda.amp.autocast(enabled=args.fp16):
 
             # Encode Speaker
@@ -124,13 +128,15 @@ for epoch in range(args.epoch):
             loss_convertor = loss_adv + weight_rec * loss_rec + weight_con * loss_con + weight_kl * loss_kl
 
         scaler.scale(loss_convertor).backward()
-        torch.nn.utils.clip_grad_norm_(C.parameters(), 1.0)
-        scaler.step(OptC)
+        if batch % grad_acc == 0:
+            torch.nn.utils.clip_grad_norm_(C.parameters(), 1.0)
+            scaler.step(OptC)
         
         # Train Discriminator
         convert_out = convert_out.detach()
         rec_out = rec_out.detach()
-        OptD.zero_grad()
+        if batch % grad_acc == 0:
+            OptD.zero_grad()
         with torch.cuda.amp.autocast(enabled=args.fp16):
             loss_d = 0
             for logit in D.logits(convert_out):
@@ -139,12 +145,13 @@ for epoch in range(args.epoch):
                 loss_d += ((logit - 1) ** 2).mean()
             for logit in D.logits(wave_src):
                 loss_d += (logit ** 2).mean()
+        
+        if batch % grad_acc == 0:
+            scaler.scale(loss_d).backward()
+            torch.nn.utils.clip_grad_norm_(D.parameters(), 1.0)
+            scaler.step(OptD)
 
-        scaler.scale(loss_d).backward()
-        torch.nn.utils.clip_grad_norm_(D.parameters(), 1.0)
-        scaler.step(OptD)
-
-        scaler.update()
+            scaler.update()
 
         bar.set_description(f"G: {loss_convertor.item():.4f}, D: {loss_d.item():.4f}")
         tqdm.write(f"Adv.: {loss_adv.item():.4f}, Spe.: {loss_spe.item():.4f}, F.M.: {loss_fm.item():.4f}, Con.: {loss_con.item():.4f}, K.L.: {loss_kl.item():.4f}")
