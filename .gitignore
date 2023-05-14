@@ -163,6 +163,8 @@ cython_debug/
 # Data
 *.wav
 *.txt
+*.png
+*.jpg
 
 # Model
 *.pth
@@ -174,3 +176,4 @@ cython_debug/
 
 # MacOS
 *.DS_Store
+
