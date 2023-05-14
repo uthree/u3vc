@@ -24,7 +24,6 @@ class SpeakerEncoder(nn.Module):
                 sample_rate=22050,
                 n_fft=512,
                 n_mels=80,
-                normalized=True
                 )
         self.layers = nn.Sequential(
                     nn.Conv1d(80, 32, 3, 1, 1),
