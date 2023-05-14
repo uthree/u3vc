@@ -6,7 +6,6 @@ import torch
 import torchaudio
 from  torchaudio.functional import resample as resample
 
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 from model import Convertor
@@ -47,8 +46,6 @@ for i, path in enumerate(paths):
             wf = resample(wf, sr, 22050)
             wf = wf.to(device)
             c = convertor.content_encoder(wf)
-            plt.imshow(c[0].cpu())
-            plt.savefig(f"./outputs/out_{i}_c.png", dpi=200)
             wf = convertor.generator(c, target_speaker)
             wf = resample(wf, 22050, sr)
     wf = wf.to('cpu').detach()
