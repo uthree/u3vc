@@ -95,7 +95,7 @@ class GeneratorResStack(nn.Module):
     def __init__(self,
             channels,
             condition_channels=128,
-            num_layers=4):
+            num_layers=2):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
