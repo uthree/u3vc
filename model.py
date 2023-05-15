@@ -110,30 +110,21 @@ class GeneratorResStack(nn.Module):
 class ContentEncoder(nn.Module):
     def __init__(self, dim_content=4):
         super().__init__()
-        self.initial_conv = nn.Conv1d(1, 32, 7, 1, 3)
-        self.c1 = ContentEncoderResStack(32)
-        self.d1 = nn.Conv1d(32, 64, 4, 2, 1)
-        self.c2 = ContentEncoderResStack(64)
-        self.d2 = nn.Conv1d(64, 128, 4, 2, 1)
-        self.c3 = ContentEncoderResStack(128)
-        self.d3 = nn.Conv1d(128, 256, 16, 8, 4)
-        self.c4 = ContentEncoderResStack(256)
-        self.d4 = nn.Conv1d(256, 256, 16, 8, 4)
+        self.to_mel = torchaudio.transforms.MelSpectrogram(
+                sample_rate=22050,
+                n_fft=512,
+                n_mels=80
+                )
+        self.initial_conv = nn.Conv1d(80, 256, 7, 1, 3)
+        self.c1 = ContentEncoderResStack(256, num_layers=4)
         self.last_conv = nn.Conv1d(256, dim_content, 7, 1, 3)
 
     def forward(self, x):
         # x: [batch, len]
-        x = x.unsqueeze(1)
-        # x: [batch, 1, len]
+        x = self.to_mel(x)[:, :, 1:]
+        # x: [batch, 80, len]
         x = self.initial_conv(x)
         x = self.c1(x)
-        x = self.d1(x)
-        x = self.c2(x)
-        x = self.d2(x)
-        x = self.c3(x)
-        x = self.d3(x)
-        x = self.c4(x)
-        x = self.d4(x)
         x = self.last_conv(x)
         return x
 
