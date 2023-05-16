@@ -46,40 +46,46 @@ class SpeakerEncoder(nn.Module):
 
 
 class ContentEncoderResBlock(nn.Module):
-    def __init__(self, channels):
+    def __init__(self, channels, kernel_size=3, dilation=1):
         super().__init__()
-        self.input_conv1 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=1, padding='same'))
-        self.input_conv2 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=2, padding='same'))
-        self.input_conv3 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=3, padding='same'))
-        self.act = nn.LeakyReLU(0.1)
+        self.input_conv = wn(nn.Conv1d(channels, channels, kernel_size, 1, dilation=dilation, padding='same'))
+        self.tanh_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.sigmoid_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.res_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.output_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.tanh = nn.Tanh()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        o1 = self.act(self.input_conv1(x))
-        o2 = self.act(self.input_conv2(x))
-        o3 = self.act(self.input_conv3(x))
-        return o1 + o2 + o3 + x
+        res = self.res_conv(x)
+        x = self.input_conv(x)
+        x = self.tanh(self.tanh_conv(x)) * self.sigmoid(self.sigmoid_conv(x))
+        x = self.output_conv(x)
+        return x + res
 
 
 class GeneratorResBlock(nn.Module):
-    def __init__(self, channels, condition_channels=128):
+    def __init__(self, channels, condition_channels=128, kernel_size=3, dilation=1):
         super().__init__()
-        self.input_conv1 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=1, padding='same'))
-        self.condition_conv1 = wn(nn.Conv1d(condition_channels, channels, 1, 1, 0))
-        self.input_conv2 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=2, padding='same'))
-        self.condition_conv2 = wn(nn.Conv1d(condition_channels, channels, 1, 1, 0))
-        self.input_conv3 = wn(nn.Conv1d(channels, channels, 7, 1, dilation=3, padding='same'))
-        self.condition_conv3 = wn(nn.Conv1d(condition_channels, channels, 1, 1, 0))
-        self.act = nn.LeakyReLU(0.1)
+        self.input_conv = wn(nn.Conv1d(channels, channels, kernel_size, 1, dilation=dilation, padding='same'))
+        self.condition_conv = wn(nn.Conv1d(condition_channels, channels, 1, 1, 0))
+        self.tanh_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.sigmoid_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.res_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.output_conv = wn(nn.Conv1d(channels, channels, 1, 1, 0))
+        self.tanh = nn.Tanh()
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, c):
-        o1 = self.act(self.input_conv1(x)) * self.condition_conv1(c)
-        o2 = self.act(self.input_conv2(x)) * self.condition_conv2(c)
-        o3 = self.act(self.input_conv3(x)) * self.condition_conv3(c)
-        return o1 + o2 + o3 + x
-        
+        res = self.res_conv(x)
+        x = self.input_conv(x) + self.condition_conv(c)
+        x = self.tanh(self.tanh_conv(x)) * self.sigmoid(self.sigmoid_conv(x))
+        x = self.output_conv(x)
+        return x + res
+
 
 class ContentEncoderResStack(nn.Module):
-    def __init__(self, channels, num_layers=2):
+    def __init__(self, channels, num_layers=4):
         super().__init__()
         self.layers = nn.ModuleList([])
         for _ in range(num_layers):
