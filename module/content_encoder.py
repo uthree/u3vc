@@ -4,9 +4,9 @@ import torch.nn as nn
 from .wn import WN
 
 
-class PosteriorEncoder(nn.Module):
+class ContentEncoder(nn.Module):
     def __init__(self,
-            input_channels=513,
+            input_channels=762,
             output_channels=192,
             internal_channels=192,
             speaker_encoding_channels=256,
