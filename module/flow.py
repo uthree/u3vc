@@ -16,7 +16,7 @@ class Flip(nn.Module):
 class ResidualCouplingLayer(nn.Module):
     def __init__(self,
             input_channels=192,
-            content_embedding_channels=192,
+            internal_channels=192,
             speaker_encoding_channels=256,
             kernel_size=5,
             dilation_rate=1,
@@ -25,9 +25,9 @@ class ResidualCouplingLayer(nn.Module):
 
         half_channels = input_channels // 2
 
-        self.pre = nn.Conv1d(half_channels, content_embedding_channels, 1, 1, 0)
-        self.wn = WN(content_embedding_channels, kernel_size, dilation_rate, speaker_encoding_channels)
-        self.post = nn.Conv1d(content_embedding_channels, half_channels, 1, 1, 0)
+        self.pre = nn.Conv1d(half_channels, internal_channels, 1, 1, 0)
+        self.wn = WN(internal_channels, kernel_size, dilation_rate, speaker_encoding_channels)
+        self.post = nn.Conv1d(internal_channels, half_channels, 1, 1, 0)
 
         self.post.weight.data.zero_()
         self.post.bias.data.zero_()
@@ -51,7 +51,7 @@ class ResidualCouplingLayer(nn.Module):
 class Flow(nn.Module):
     def __init__(self,
             input_channels=192,
-            content_embedding_channels=192,
+            internal_channels=192,
             speaker_encoding_channels=256,
             kernel_size=5,
             dilation_rate=1,
@@ -65,7 +65,7 @@ class Flow(nn.Module):
             self.flows.append(
                     ResidualCouplingLayer(
                         input_channels,
-                        content_embedding_channels,
+                        internal_channels,
                         speaker_encoding_channels,
                         kernel_size,
                         dilation_rate,
