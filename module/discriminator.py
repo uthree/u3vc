@@ -21,8 +21,8 @@ class PeriodicDiscriminator(nn.Module):
                 nn.Conv2d(1, channels, (kernel_size, 1), (stride, 1), 0))
         self.layers = nn.Sequential()
         for i in range(num_stages):
-            c = channels * (2 ** i)
-            c_next = channels * (2 ** (i+1))
+            c = channels #* (2 ** i)
+            c_next = channels #* (2 ** (i+1))
             if i == (num_stages - 1):
                 self.layers.append(
                         nn.utils.spectral_norm(
@@ -35,7 +35,7 @@ class PeriodicDiscriminator(nn.Module):
                         nn.Dropout(dropout_rate))
                 self.layers.append(
                         nn.LeakyReLU(LRELU_SLOPE))
-        c = channels * (2 ** (num_stages-1))
+        c = channels #* (2 ** (num_stages-1))
         self.final_conv = nn.utils.spectral_norm(
                 nn.Conv2d(c, c, (5, 1), 1, 0)
                 )

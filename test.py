@@ -22,6 +22,4 @@ spec = to_spectrogram(wave)[:, :, 1:]
 mu, sigma = posterior_encoder(spec, spk)
 z = mu + torch.exp(sigma) * torch.randn_like(sigma)
 out = decoder(z, spk)
-logits = discriminator.logits(out)
-for logit in logits:
-    print(logit.shape)
+print(out.shape)
