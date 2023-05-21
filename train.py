@@ -110,6 +110,7 @@ for epoch in range(args.epoch):
         scaler.scale(loss_c).backward()
         scaler.step(OptC)
 
+
         # Train Discriminator.
         OptD.zero_grad()
         wave_out = wave_out.detach() # Fake wave
@@ -121,9 +122,9 @@ for epoch in range(args.epoch):
             logits = Dis.logits(wave)
             for logit in logits:
                 loss_d += ((logit) ** 2).mean()
-
         scaler.scale(loss_d).backward()
         scaler.step(OptD)
+
         scaler.update()
         
         tqdm.write(f"D: {loss_d.item():.4f}, Adv.: {loss_adv.item():.4f}, F.M.: {loss_fm.item():.4f}, Mel.: {loss_mel.item():.4f}, L1: {loss_l1.item():.4f}, K.L.: {loss_kl.item():.4f}")
