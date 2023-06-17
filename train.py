@@ -89,7 +89,7 @@ to_melspectrogram = torchaudio.transforms.MelSpectrogram(n_fft=1024, n_mels=80).
 
 grad_acc = args.gradient_accumulation
 
-weight_l1 = 45.0
+weight_l1 = 5.0
 weight_kl = 1.0
 weight_fm = 2.0
 weight_mel = 45.0
