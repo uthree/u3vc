@@ -89,9 +89,9 @@ to_melspectrogram = torchaudio.transforms.MelSpectrogram(n_fft=1024, n_mels=80).
 
 grad_acc = args.gradient_accumulation
 
-weight_l1 = 1.0
+weight_l1 = 45.0
 weight_kl = 1.0
-weight_fm = 1.0
+weight_fm = 2.0
 weight_mel = 45.0
 
 for epoch in range(args.epoch):
@@ -119,7 +119,6 @@ for epoch in range(args.epoch):
             mean_theta, logvar_theta = Eb(ssl)
             z_theta = mean_theta + torch.exp(logvar_theta) * torch.randn_like(logvar_theta)
             flow_out = Flow(z_phi, spk, reverse=True)
-            z_theta = F.interpolate(z_theta, flow_out.shape[2])
             loss_l1 = (z_theta - flow_out).abs().mean()
             loss_kl = (-1 -logvar_phi + torch.exp(logvar_phi) + mean_phi ** 2).mean() +\
                     (-1 -logvar_theta + torch.exp(logvar_theta) + mean_theta ** 2).mean()
