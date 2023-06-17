@@ -7,9 +7,9 @@ from .wn import WN
 class PosteriorEncoder(nn.Module):
     def __init__(self,
             input_channels=513,
-            output_channels=192,
-            internal_channels=192,
-            speaker_encoding_channels=256,
+            output_channels=96,
+            internal_channels=96,
+            speaker_encoding_channels=128,
             kernel_size=5,
             dilation_rate=1,
             num_resblock=16):

@@ -15,9 +15,9 @@ class Flip(nn.Module):
 
 class ResidualCouplingLayer(nn.Module):
     def __init__(self,
-            input_channels=192,
-            internal_channels=192,
-            speaker_encoding_channels=256,
+            input_channels=96,
+            internal_channels=96,
+            speaker_encoding_channels=128,
             kernel_size=5,
             dilation_rate=1,
             num_wn_block=4):
@@ -50,9 +50,9 @@ class ResidualCouplingLayer(nn.Module):
 
 class Flow(nn.Module):
     def __init__(self,
-            input_channels=192,
-            internal_channels=192,
-            speaker_encoding_channels=256,
+            input_channels=96,
+            internal_channels=96,
+            speaker_encoding_channels=128,
             kernel_size=5,
             dilation_rate=1,
             num_flows=4,

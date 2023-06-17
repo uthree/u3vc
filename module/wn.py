@@ -4,10 +4,10 @@ import torch.nn as nn
 
 class WNBlock(nn.Module):
     def __init__(self,
-            hidden_channels=192,
+            hidden_channels=96,
             kernel_size=5,
             dilation_rate=1,
-            speaker_encoding_channels=256,
+            speaker_encoding_channels=128,
             with_speaker=True
             ):
         super().__init__()
@@ -32,11 +32,11 @@ class WNBlock(nn.Module):
 
 class WN(nn.Module):
     def __init__(self,
-            hidden_channels=192,
+            hidden_channels=96,
             kernel_size=5,
             dilation_rate=1,
             num_blocks=4,
-            speaker_encoding_channels=256,
+            speaker_encoding_channels=128,
             with_speaker=True):
 
         super().__init__()

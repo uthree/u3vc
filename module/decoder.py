@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.nn.utils.weight_norm as weight_norm
 
 
 LRELU_SLOPE = 0.1
@@ -25,11 +24,11 @@ class ResBlock(nn.Module):
 
         for d in dilation:
             self.convs1.append(
-                    weight_norm(nn.Conv1d(channels, channels, kernel_size, 1, dilation=d,
-                        padding=get_padding(kernel_size, d))))
+                    nn.Conv1d(channels, channels, kernel_size, 1, dilation=d,
+                        padding=get_padding(kernel_size, d)))
             self.convs2.append(
-                    weight_norm(nn.Conv1d(channels, channels, kernel_size, 1, dilation=d,
-                        padding=get_padding(kernel_size, d))))
+                    nn.Conv1d(channels, channels, kernel_size, 1, dilation=d,
+                        padding=get_padding(kernel_size, d)))
 
         self.convs1.apply(init_weights)
         self.convs2.apply(init_weights)
@@ -64,9 +63,9 @@ class MRF(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self,
-            input_channels=192,
-            upsample_initial_channels=512,
-            speaker_encoding_channels=256,
+            input_channels=96,
+            upsample_initial_channels=256,
+            speaker_encoding_channels=128,
             deconv_strides=[8, 8, 2, 2],
             deconv_kernel_sizes=[16, 16, 4, 4],
             resblock_kernel_sizes=[3, 7, 11],
@@ -79,11 +78,10 @@ class Decoder(nn.Module):
         self.ups = nn.ModuleList([])
         for i, (s, k) in enumerate(zip(deconv_strides, deconv_kernel_sizes)):
             self.ups.append(
-                    weight_norm(
-                        nn.ConvTranspose1d(
-                            upsample_initial_channels//(2**i),
-                            upsample_initial_channels//(2**(i+1)),
-                            k, s, (k-s)//2)))
+                    nn.ConvTranspose1d(
+                        upsample_initial_channels//(2**i),
+                        upsample_initial_channels//(2**(i+1)),
+                        k, s, (k-s)//2))
 
         self.MRFs = nn.ModuleList([])
         for i in range(len(self.ups)):

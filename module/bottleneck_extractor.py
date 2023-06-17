@@ -4,16 +4,16 @@ import torch.nn as nn
 from .wn import WN
 
 
-class ContentEncoder(nn.Module):
+class BottleneckExtractor(nn.Module):
     def __init__(self,
-            input_channels=513,
-            output_channels=192,
-            internal_channels=192,
+            input_channels=768,
+            output_channels=96,
+            internal_channels=96,
             bottleneck_channels=4,
-            speaker_encoding_channels=256,
+            speaker_encoding_channels=128,
             kernel_size=5,
             dilation_rate=1,
-            num_resblock=4):
+            num_resblock=1):
         super().__init__()
 
         self.input_layer = nn.Conv1d(input_channels, internal_channels, 1, 1, 0)
