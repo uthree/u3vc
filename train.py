@@ -20,7 +20,7 @@ parser.add_argument('-d', '--device', default='cpu')
 parser.add_argument('-e', '--epoch', default=1000, type=int)
 parser.add_argument('-b', '--batch-size', default=1, type=int)
 parser.add_argument('-lr', '--learning-rate', default=1e-4, type=float)
-parser.add_argument('-len', '--length', default=32768, type=int)
+parser.add_argument('-len', '--length', default=65536*2, type=int)
 parser.add_argument('-m', '--max-data', default=-1, type=int)
 parser.add_argument('-fp16', default=False, type=bool)
 parser.add_argument('-gacc', '--gradient-accumulation', default=1, type=int)
@@ -47,15 +47,15 @@ def write_preview(source_wave, file_path='./preview.wav'):
 
 def cut_center_wave(wave):
     length = wave.shape[1]
-    s = length//2 - length//4
-    e = length//2 + length//4
+    s = length//2 - length//8
+    e = length//2 + length//8
     return wave[:, s:e]
 
 
-def cut_center_spec(spec):
+def cut_center(spec):
     length = spec.shape[2]
-    s = length//2 - length//4
-    e = length//2 + length//4
+    s = length//2 - length//8
+    e = length//2 + length//8
     return spec[:, :, s:e]
 
 
@@ -89,7 +89,7 @@ to_melspectrogram = torchaudio.transforms.MelSpectrogram(n_fft=1024, n_mels=80).
 
 grad_acc = args.gradient_accumulation
 
-weight_l1 = 45.0
+weight_l1 = 1.0
 weight_kl = 1.0
 weight_fm = 2.0
 weight_mel = 45.0
@@ -107,10 +107,11 @@ for epoch in range(args.epoch):
             spk = Es(melspec)
             mean_phi, logvar_phi = Ep(spec, spk)
             z_phi = mean_phi + torch.exp(logvar_phi) * torch.randn_like(logvar_phi)
-            wave_out = Dec(z_phi, spk)
+            z_phi_center = cut_center(z_phi)
+            wave_out = Dec(z_phi_center, spk)
             mel_out = to_melspectrogram(wave_out)[:, :, 1:]
-            loss_mel = (cut_center_spec(melspec) - cut_center_spec(mel_out)).abs().mean()
-            loss_fm = Dis.feat_loss(cut_center_wave(wave_out), cut_center_wave(wave))
+            loss_mel = (cut_center(melspec) - mel_out).abs().mean()
+            loss_fm = Dis.feat_loss(wave_out, cut_center_wave(wave))
             logits = Dis.logits(wave_out)
             loss_adv = 0
             for logit in logits:
