@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torch.nn.utils import weight_norm, remove_weight_norm
 
 LRELU_SLOPE = 0.1
 
@@ -24,11 +24,11 @@ class ResBlock(nn.Module):
 
         for d in dilation:
             self.convs1.append(
-                    nn.Conv1d(channels, channels, kernel_size, 1, dilation=d,
-                        padding=get_padding(kernel_size, d)))
+                    weight_norm(nn.Conv1d(channels, channels, kernel_size, 1, dilation=d,
+                        padding=get_padding(kernel_size, d))))
             self.convs2.append(
-                    nn.Conv1d(channels, channels, kernel_size, 1, dilation=d,
-                        padding=get_padding(kernel_size, d)))
+                    weight_norm(nn.Conv1d(channels, channels, kernel_size, 1, dilation=d,
+                        padding=get_padding(kernel_size, d))))
 
         self.convs1.apply(init_weights)
         self.convs2.apply(init_weights)
@@ -36,11 +36,16 @@ class ResBlock(nn.Module):
     def forward(self, x):
         for c1, c2 in zip(self.convs1, self.convs2):
             xt = F.leaky_relu(x, LRELU_SLOPE)
-            xt = c1(x)
+            xt = c1(xt)
             xt = F.leaky_relu(xt, LRELU_SLOPE)
-            xt = c2(x)
+            xt = c2(xt)
             x = xt + x
         return x
+
+    def remove_weight_norm(self):
+        for c1, c2 in zip(self.convs1, self.convs2):
+            remove_weight_norm(c1)
+            remove_weight_norm(c2)
 
 
 class MRF(nn.Module):
@@ -55,51 +60,65 @@ class MRF(nn.Module):
                     ResBlock(channels, k, d))
 
     def forward(self, x):
+        out = 0
         for block in self.blocks:
-            xt = block(x)
-            x = xt + x
-        return x
+            out += block(x)
+        return out
+
+    def remove_weight_norm(self):
+        for block in self.blocks:
+            remove_weight_norm(block)
 
 
 class Decoder(nn.Module):
     def __init__(self,
             input_channels=96,
             upsample_initial_channels=256,
-            speaker_encoding_channels=128,
+            speaker_embedding_channels=128,
             deconv_strides=[8, 8, 2, 2],
             deconv_kernel_sizes=[16, 16, 4, 4],
             resblock_kernel_sizes=[3, 7, 11],
             resblock_dilation_rates=[[1, 3, 5], [1, 3, 5], [1, 3, 5]]
             ):
         super().__init__()
-        self.pre = nn.Conv1d(input_channels, upsample_initial_channels, 7, 1, 3)
-        self.spk = nn.Conv1d(speaker_encoding_channels, upsample_initial_channels, 1, 1, 0)
+        self.num_kernels = len(resblock_kernel_sizes)
+        self.pre = weight_norm(nn.Conv1d(input_channels, upsample_initial_channels, 7, 1, 3))
+        self.spk = weight_norm(nn.Conv1d(speaker_embedding_channels, upsample_initial_channels, 1, 1, 0))
 
         self.ups = nn.ModuleList([])
         for i, (s, k) in enumerate(zip(deconv_strides, deconv_kernel_sizes)):
             self.ups.append(
-                    nn.ConvTranspose1d(
-                        upsample_initial_channels//(2**i),
-                        upsample_initial_channels//(2**(i+1)),
-                        k, s, (k-s)//2))
+                    weight_norm(
+                        nn.ConvTranspose1d(
+                            upsample_initial_channels//(2**i),
+                            upsample_initial_channels//(2**(i+1)),
+                            k, s, (k-s)//2)))
 
         self.MRFs = nn.ModuleList([])
         for i in range(len(self.ups)):
             c = upsample_initial_channels//(2**(i+1))
             self.MRFs.append(MRF(c, resblock_kernel_sizes, resblock_dilation_rates))
-
-        self.post = nn.Conv1d(c, 1, 7, 1, 3, bias=False)
+        
+        self.post = weight_norm(nn.Conv1d(c, 1, 7, 1, 3, bias=False))
         self.ups.apply(init_weights)
     
-    def forward(self, x, speaker):
-        x = self.pre(x) + self.spk(speaker)
+    def forward(self, x, spk):
+        x = self.pre(x) + self.spk(spk)
         for up, MRF in zip(self.ups, self.MRFs):
             x = F.leaky_relu(x, LRELU_SLOPE)
             x = up(x)
-            x = MRF(x)
-        x = F.leaky_relu(x, LRELU_SLOPE)
+            x = MRF(x) / self.num_kernels
+        x = F.leaky_relu(x)
         x = self.post(x)
         x = torch.tanh(x)
         x = x.squeeze(1)
         return x
 
+
+    def remove_weight_norm(self):
+        remove_weight_norm(self.pre)
+        remove_weight_norm(self.post)
+        for up in self.ups:
+            remove_weight_norm(up)
+        for MRF in self.MRFs:
+            remove_weight_norm(MRF)
