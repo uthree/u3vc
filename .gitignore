@@ -169,6 +169,7 @@ cython_debug/
 # Model
 *.pth
 *.pt
+!intermediate.wav
 
 # Vim
 *.swp

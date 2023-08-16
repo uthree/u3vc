@@ -82,8 +82,8 @@ class Decoder(nn.Module):
             ):
         super().__init__()
         self.num_kernels = len(resblock_kernel_sizes)
-        self.pre = weight_norm(nn.Conv1d(input_channels, upsample_initial_channels, 7, 1, 3))
-        self.spk = weight_norm(nn.Conv1d(speaker_embedding_channels, upsample_initial_channels, 1, 1, 0))
+        self.pre = nn.Conv1d(input_channels, upsample_initial_channels, 7, 1, 3)
+        self.spk = nn.Conv1d(speaker_embedding_channels, upsample_initial_channels, 1, 1, 0)
 
         self.ups = nn.ModuleList([])
         for i, (s, k) in enumerate(zip(deconv_strides, deconv_kernel_sizes)):

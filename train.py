@@ -76,7 +76,7 @@ OptC = optim.Adam(model.convertor.parameters(), lr=args.learning_rate)
 OptD = optim.Adam(model.discriminator.parameters(), lr=args.learning_rate)
 
 Dis = model.discriminator
-Eb = model.convertor.bottleneck_extractor
+Ec = model.convertor.content_extractor
 Es = model.convertor.speaker_encoder
 Dec = model.convertor.decoder
 Flow = model.convertor.flow
@@ -89,7 +89,7 @@ to_melspectrogram = torchaudio.transforms.MelSpectrogram(n_fft=1024, n_mels=80).
 
 grad_acc = args.gradient_accumulation
 
-weight_l1 = 45.0
+weight_l1 = 10.0
 weight_kl = 1.0
 weight_fm = 2.0
 weight_mel = 45.0
@@ -117,12 +117,11 @@ for epoch in range(args.epoch):
             for logit in logits:
                 loss_adv += (logit ** 2).mean()
             ssl = interpolate_hubert_output(hubert(wave), wave.shape[1])
-            mean_theta, logvar_theta = Eb(ssl)
-            z_theta = mean_theta + torch.exp(logvar_theta) * torch.randn_like(logvar_theta)
+            z_theta = Ec(ssl)
             flow_out = Flow(z_phi, spk, reverse=True)
             loss_l1 = (z_theta - flow_out).abs().mean()
-            loss_kl = (-1 -logvar_phi + torch.exp(logvar_phi) + mean_phi ** 2).mean() +\
-                    (-1 -logvar_theta + torch.exp(logvar_theta) + mean_theta ** 2).mean()
+            loss_kl = (-1 -logvar_phi + torch.exp(logvar_phi) + mean_phi ** 2).mean()
+
             # nan reduction
             if torch.any(torch.isnan(loss_mel)):
                 loss_mel = torch.tensor(0).to(device)
@@ -143,7 +142,7 @@ for epoch in range(args.epoch):
             logits = Dis.logits(wave_out)
             for logit in logits:
                 loss_d += ((logit - 1) ** 2).mean()
-            logits = Dis.logits(wave)
+            logits = Dis.logits(cut_center_wave(wave))
             for logit in logits:
                 loss_d += ((logit) ** 2).mean()
         scaler.scale(loss_d).backward()
@@ -158,6 +157,7 @@ for epoch in range(args.epoch):
 
         if batch % 100 == 0:
             save_models(model)
+            write_preview(wave_out[0].unsqueeze(0))
 
 print("Training Complete!")
 save_models(model)
