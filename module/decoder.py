@@ -99,7 +99,7 @@ class Decoder(nn.Module):
             c = upsample_initial_channels//(2**(i+1))
             self.MRFs.append(MRF(c, resblock_kernel_sizes, resblock_dilation_rates))
         
-        self.post = weight_norm(nn.Conv1d(c, 1, 7, 1, 3, bias=False))
+        self.post = nn.Conv1d(c, 1, 7, 1, 3)
         self.ups.apply(init_weights)
     
     def forward(self, x, spk):
